@@ -17,8 +17,11 @@
 
 use std::process;
 
+use chrono::Local;
+
 use track::Res;
 use track::app;
+use track::data;
 
 fn main() {
     if let Err(err) = try_main() {
@@ -35,6 +38,13 @@ fn try_main() -> Res<()> {
         // Can use unwrap because it is required
         let value = sub.value_of(app::NewValue::name()).unwrap();
         println!("{:?}", value);
+
+        // Get the entry that would be created for that value
+        let entry = data::Entry::new(value.to_owned());
+        println!("{:?}", entry);
+
+        // Print its date as local time
+        println!("{:?}", entry.date().with_timezone(&Local));
     }
 
     Ok(())
