@@ -22,6 +22,7 @@ use chrono::Local;
 use track::Res;
 use track::app;
 use track::data;
+use track::file::FileAccess;
 
 fn main() {
     if let Err(err) = try_main() {
@@ -41,10 +42,16 @@ fn try_main() -> Res<()> {
 
         // Get the entry that would be created for that value
         let entry = data::Entry::new(value.to_owned());
-        println!("{:?}", entry);
+        let day = data::Day::new(entry);
+
+        let file_access = FileAccess::new();
+        file_access.write(&day)?;
+
+        let read_day: data::Day = file_access.read()?;
+        println!("{:?}", read_day);
 
         // Print its date as local time
-        println!("{:?}", entry.date().with_timezone(&Local));
+        //println!("{:?}", entry.date().with_timezone(&Local).date().to_string());
     }
 
     Ok(())

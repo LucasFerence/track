@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::fs::{File, create_dir};
 
-use serde_json::{Map, Value};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use clap::crate_name;
 use directories::BaseDirs;
 
@@ -22,34 +23,26 @@ impl FileAccess {
         FileAccess { path: None }
     }
 
-    pub fn read(&self) -> Res<Value> {
+    pub fn read<T: DeserializeOwned>(&self) -> Res<T> {
         match &self.path {
             Some(path_buf) => {
                 let path = path_buf.as_path();
-
-                let val;
                 let file_path = path.join(FILE_NAME);
-        
-                if file_path.exists() {
-                    println!("Found file... reading");
-        
-                    let file = File::open(file_path)?;
-                    val = serde_json::from_reader(file)?;
-                } else {
-                    println!("Creating new file at {:?}", file_path);
-        
-                    let map = Map::new();
-                    self.write(&map)?;
-                    val = Value::Object(map);
-                }
 
-                return Ok(val)
+                if file_path.exists() {
+                    let file = File::open(file_path)?;
+                    let read_val = serde_json::from_reader(file)?;
+
+                    Ok(read_val)
+                } else {
+                    return Err(Box::from("No path!"))
+                }
             },
             _ => return Err(Box::from("No path!"))
         }
     }
 
-    pub fn write(&self, val: &Map<String, Value>) -> Res<()> {
+    pub fn write<T: Serialize>(&self, val: &T) -> Res<()> {
         match &self.path {
             Some(path_buf) => {
                 let path = path_buf.as_path();

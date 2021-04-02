@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Date, NaiveDateTime, Utc};
 
 // Created when `track new {description}`
 #[derive(Debug, Deserialize, Serialize)]
@@ -32,8 +32,26 @@ pub struct Day {
     entries: Vec<Entry>
 }
 
+impl Day {
+    pub fn new(first_entry: Entry) -> Self {
+        Day {
+            day: Utc::now().date().to_string(),
+            entries: vec!(first_entry)
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Root {
     next_id: usize,
     days: Vec<Day>
+}
+
+impl Root {
+    pub fn new() -> Self {
+        Root {
+            next_id: 1,
+            days: Vec::new()
+        }
+    }
 }
