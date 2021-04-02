@@ -17,8 +17,6 @@
 
 use std::process;
 
-use chrono::Local;
-
 use track::Res;
 use track::app;
 use track::data;
@@ -32,26 +30,35 @@ fn main() {
 }
 
 fn try_main() -> Res<()> {
+    // Ensure the file is correct before we do anything
+    data::ensure_file()?;
+
     let matches = app::app().get_matches();
 
     if let Some(sub) = matches.subcommand_matches(app::New::name()) {
 
         // Can use unwrap because it is required
         let value = sub.value_of(app::NewValue::name()).unwrap();
-        println!("{:?}", value);
 
-        // Get the entry that would be created for that value
-        let entry = data::Entry::new(value.to_owned());
-        let day = data::Day::new(entry);
-
+        // Get file access and root
         let file_access = FileAccess::new();
-        file_access.write(&day)?;
+        let mut root: data::Root = file_access.read()?;
 
-        let read_day: data::Day = file_access.read()?;
-        println!("{:?}", read_day);
+        // Create entry from input value
+        let entry = root.create_entry(value.to_owned());
 
-        // Print its date as local time
-        //println!("{:?}", entry.date().with_timezone(&Local).date().to_string());
+        match root.today() {
+            Some(today) => {
+                today.add_entry(entry);
+            },
+            _ => {
+                let mut new_day = data::Day::new();
+                new_day.add_entry(entry);
+                root.add_day(new_day);
+            }
+        }
+
+        file_access.write(&root)?;
     }
 
     Ok(())

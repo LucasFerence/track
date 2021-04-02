@@ -1,5 +1,20 @@
 use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Date, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
+
+use crate::file::FileAccess;
+use crate::Res;
+
+// Ensure the file exists
+pub fn ensure_file() -> Res<()> {
+    let file_access = FileAccess::new();
+
+    // Create it if it doesn't exist
+    if !file_access.exists() {
+        file_access.write(&Root::new())?;
+    }
+
+    Ok(())
+}
 
 // Created when `track new {description}`
 #[derive(Debug, Deserialize, Serialize)]
@@ -10,9 +25,9 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(desc: String) -> Self {
+    fn new(id: usize, desc: String) -> Self {
         Entry {
-            id: 1,
+            id: id,
             description: desc,
             date: Utc::now().timestamp()
         }
@@ -28,16 +43,20 @@ impl Entry {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Day {
-    day: String,
+    val: String,
     entries: Vec<Entry>
 }
 
 impl Day {
-    pub fn new(first_entry: Entry) -> Self {
+    pub fn new() -> Self {
         Day {
-            day: Utc::now().date().to_string(),
-            entries: vec!(first_entry)
+            val: get_today_string(),
+            entries: Vec::new()
         }
+    }
+
+    pub fn add_entry(&mut self, entry: Entry) {
+        self.entries.push(entry);
     }
 }
 
@@ -48,10 +67,36 @@ pub struct Root {
 }
 
 impl Root {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Root {
             next_id: 1,
             days: Vec::new()
         }
     }
+
+    pub fn create_entry(&mut self, desc: String) -> Entry {
+        let new_entry = Entry::new(self.next_id, desc);
+        self.next_id += 1;
+
+        new_entry
+    }
+
+    pub fn today(&mut self) -> Option<&mut Day> {
+        let today_string = get_today_string();
+        for day in &mut self.days {
+            if day.val == today_string {
+                return Some(day)
+            }
+        }
+
+        None
+    }
+
+    pub fn add_day(&mut self, day: Day) {
+        self.days.push(day);
+    }
+}
+
+fn get_today_string() -> String {
+    Utc::now().date().to_string()
 }

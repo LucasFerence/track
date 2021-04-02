@@ -23,6 +23,15 @@ impl FileAccess {
         FileAccess { path: None }
     }
 
+    pub fn exists(&self) -> bool {
+        match &self.path {
+            Some(path_buf) => {
+                path_buf.as_path().join(FILE_NAME).exists()
+            },
+            _ => false
+        }
+    }
+
     pub fn read<T: DeserializeOwned>(&self) -> Res<T> {
         match &self.path {
             Some(path_buf) => {
@@ -35,7 +44,7 @@ impl FileAccess {
 
                     Ok(read_val)
                 } else {
-                    return Err(Box::from("No path!"))
+                    return Err(Box::from("Cannot find file!"))
                 }
             },
             _ => return Err(Box::from("No path!"))
