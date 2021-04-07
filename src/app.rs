@@ -6,6 +6,7 @@ pub fn app() -> App<'static, 'static> {
         .author(crate_authors!())
         .subcommand(New::create())
         .subcommand(Report::create())
+        .subcommand(Start::create())
 }
 
 // --- NEW SUBCOMMAND ---
@@ -45,5 +46,32 @@ impl Report {
 
     pub fn name() -> &'static str {
         "report"
+    }
+}
+
+// --- START SUBCOMMAND ---
+
+pub struct Start;
+impl Start {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+            .arg(StartValue::create())
+    }
+
+    pub fn name() -> &'static str {
+        "start"
+    }
+}
+
+pub struct StartValue;
+impl StartValue {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .required(true)
+            .index(1)
+    }
+
+    pub fn name() -> &'static str {
+        "start-value"
     }
 }

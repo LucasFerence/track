@@ -64,6 +64,7 @@ fn try_main() -> Res<()> {
         file_access.write(&root)?;
     }
 
+    // REPORT
     if let Some(_) = matches.subcommand_matches(app::Report::name()) {
         // Show the current day
 
@@ -73,6 +74,31 @@ fn try_main() -> Res<()> {
 
         if let Some(today) = root.today() {
             table::display(today);
+        }
+    }
+
+    // START
+    if let Some(sub) = matches.subcommand_matches(app::Start::name()) {
+
+        // Can use unwrap because it is required
+        let id = sub.value_of(app::StartValue::name()).unwrap();
+
+        // Get file access and root
+        let file_access = FileAccess::new();
+        let mut root: data::Root = file_access.read()?;
+
+        // Find the entry in the current day with the ID
+        let found_entry = root.today()
+            .map(|today| today.find_by_id(id))
+            .unwrap_or_default();
+
+        if let Some(fe) = found_entry {
+            fe.start();
+
+            println!("Started:");
+            table::display(fe);
+
+            file_access.write(&root)?;
         }
     }
 
