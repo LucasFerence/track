@@ -1,8 +1,10 @@
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use prettytable::{Cell, Row, row, cell};
 
 use crate::file::FileAccess;
 use crate::Res;
+use crate::table::TableDisplay;
 
 // Ensure the file exists
 pub fn ensure_file() -> Res<()> {
@@ -57,6 +59,32 @@ impl Day {
 
     pub fn add_entry(&mut self, entry: Entry) {
         self.entries.push(entry);
+    }
+
+    pub fn entries(&self) -> &Vec<Entry> {
+        &self.entries
+    }
+}
+
+impl TableDisplay for Day {
+    
+    fn header(&self) -> Row {
+        row!["ID", "Task"]
+    }
+
+    fn rows(&self) -> Vec<Row> {
+        let mut rows: Vec<Row> = Vec::new();
+
+        for e in self.entries() {
+            let v = vec![
+                Cell::new(&e.id.to_string()),
+                Cell::new(&e.description)
+            ];
+
+            rows.push(Row::new(v));
+        }
+
+        rows
     }
 }
 

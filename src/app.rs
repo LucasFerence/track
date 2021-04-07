@@ -5,6 +5,7 @@ pub fn app() -> App<'static, 'static> {
         .version(crate_version!())
         .author(crate_authors!())
         .subcommand(New::create())
+        .subcommand(Report::create())
 }
 
 // --- NEW SUBCOMMAND ---
@@ -31,5 +32,18 @@ impl NewValue {
 
     pub fn name() -> &'static str {
         "new-value"
+    }
+}
+
+// --- REPORT SUBCOMMAND ---
+
+pub struct Report;
+impl Report {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+    }
+
+    pub fn name() -> &'static str {
+        "report"
     }
 }

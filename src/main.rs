@@ -20,6 +20,7 @@ use std::process;
 use track::Res;
 use track::app;
 use track::data;
+use track::table;
 use track::file::FileAccess;
 
 fn main() {
@@ -35,6 +36,7 @@ fn try_main() -> Res<()> {
 
     let matches = app::app().get_matches();
 
+    // NEW
     if let Some(sub) = matches.subcommand_matches(app::New::name()) {
 
         // Can use unwrap because it is required
@@ -47,6 +49,7 @@ fn try_main() -> Res<()> {
         // Create entry from input value
         let entry = root.create_entry(value.to_owned());
 
+        // Either add task to current day, or create a new day
         match root.today() {
             Some(today) => {
                 today.add_entry(entry);
@@ -59,6 +62,18 @@ fn try_main() -> Res<()> {
         }
 
         file_access.write(&root)?;
+    }
+
+    if let Some(_) = matches.subcommand_matches(app::Report::name()) {
+        // Show the current day
+
+        // Get file access and root
+        let file_access = FileAccess::new();
+        let mut root: data::Root = file_access.read()?;
+
+        if let Some(today) = root.today() {
+            table::display(today);
+        }
     }
 
     Ok(())
