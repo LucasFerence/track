@@ -1,10 +1,10 @@
 use serde::{Serialize, Deserialize};
-use chrono::Local;
-use prettytable::{Cell, Row, row, cell};
+use prettytable::{Attr, color, Cell, Row, row, cell};
 
 use crate::file::FileAccess;
 use crate::Res;
 use crate::table::TableDisplay;
+use crate::time;
 
 // Ensure the file exists
 pub fn ensure_file() -> Res<()> {
@@ -164,13 +164,13 @@ impl Task {
     }
 
     fn start(&mut self) {
-        self.started_date = Some(Local::now().timestamp());
+        self.started_date = Some(time::timestamp());
     }
 
     fn stop(&mut self) {
         let tracked = self.tracked.unwrap_or(0);
         if let Some(started) = self.started_date {
-            let now = Local::now().timestamp();
+            let now = time::timestamp();
             self.tracked = Some(tracked + (now - started));
         }
 
@@ -180,6 +180,7 @@ impl Task {
 
 // --- Table Display ---
 
+// TODO: I would like to move this TableDisplay stuff out of this file
 impl TableDisplay for Group {
     
     fn header(&self) -> Row {
@@ -189,20 +190,49 @@ impl TableDisplay for Group {
     fn rows(&self) -> Vec<Row> {
         let mut rows: Vec<Row> = Vec::new();
 
-        for e in &self.tasks {
+        // Will apply a style if `should` is true
+        let style = |cell: Cell, should: bool| -> Cell {
+            if should {
+                return cell
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::BRIGHT_RED));
+            }
+
+            cell
+        };
+
+        for e in &self.tasks {  
+            let is_started = e.started_date.is_some();
+
             let v = vec![
-                Cell::new(&e.id.to_string()),
-                Cell::new(&e.name),
-                Cell::new(
+                style(Cell::new(&e.id.to_string()), is_started),
+                style(Cell::new(&e.name), is_started),
+                style(Cell::new(
                     &e.started_date
-                        .map(|sd| sd.to_string())
+                        .map(|sd| {
+                            // This definitely needs to be refactored
+                            if let Some(dt) = time::to_datetime(sd) {
+                                return dt.to_string();
+                            }
+
+                            return String::new();
+                        })
                         .unwrap_or(String::from("STOPPED"))
-                ),
-                Cell::new(
-                    &e.tracked
-                        .map(|sd| sd.to_string())
+                ), is_started),
+                style(Cell::new(
+                    // Use started time (its running) or else tracked (if its stopped)
+                    &e.started_date
+                        .map(|sd| {
+                            
+                            let tracked = e.tracked.unwrap_or(0);
+                            let now = time::timestamp();
+                            // now minus sd plus tracked
+                            
+                            time::duration_str(tracked + (now - sd))
+                        })
+                        .or_else(|| e.tracked.map(|sd| time::duration_str(sd)))
                         .unwrap_or(String::from("NONE"))
-                )
+                ), is_started)
             ];
 
             rows.push(Row::new(v));
@@ -225,13 +255,28 @@ impl TableDisplay for Task {
             Cell::new(&self.name),
             Cell::new(
                 &self.started_date
-                    .map(|sd| sd.to_string())
+                    .map(|sd| {
+                        // This definitely needs to be refactored
+                        if let Some(dt) = time::to_datetime(sd) {
+                            return dt.to_string();
+                        }
+
+                        return String::new();
+                    })
                     .unwrap_or(String::from("STOPPED"))
             ),
             Cell::new(
-                &self.tracked
-                    .map(|sd| sd.to_string())
-                    .unwrap_or(String::from("NONE"))
+                &self.started_date
+                        .map(|sd| {
+                            
+                            let tracked = self.tracked.unwrap_or(0);
+                            let now = time::timestamp();
+                            // now minus sd plus tracked
+                            
+                            time::duration_str(tracked + (now - sd))
+                        })
+                        .or_else(|| self.tracked.map(|sd| time::duration_str(sd)))
+                        .unwrap_or(String::from("NONE"))
             )
         ];
 

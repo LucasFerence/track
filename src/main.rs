@@ -16,12 +16,12 @@
 /// `track end {id}`
 
 use std::process;
-use chrono::Local;
 
 use track::Res;
 use track::app;
 use track::manager;
 use track::table;
+use track::time;
 use track::file::FileAccess;
 
 fn main() {
@@ -40,7 +40,7 @@ fn try_main() -> Res<()> {
     let mut manager: manager::Manager = file_access.read()?;
 
     // Get the gorup for today
-    let today_group = today();
+    let today_group = time::today_date();
 
     // Match the input
     let matches = app::app().get_matches();
@@ -90,8 +90,4 @@ fn try_main() -> Res<()> {
 
     file_access.write(&manager)?;
     Ok(())
-}
-
-fn today() -> String {
-    Local::now().date().to_string()
 }
