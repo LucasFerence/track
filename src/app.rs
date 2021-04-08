@@ -7,6 +7,7 @@ pub fn app() -> App<'static, 'static> {
         .subcommand(New::create())
         .subcommand(Report::create())
         .subcommand(Start::create())
+        .subcommand(Stop::create())
 }
 
 // --- NEW SUBCOMMAND ---
@@ -73,5 +74,18 @@ impl StartValue {
 
     pub fn name() -> &'static str {
         "start-value"
+    }
+}
+
+// --- STOP SUBCOMMAND ---
+
+pub struct Stop;
+impl Stop {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+    }
+
+    pub fn name() -> &'static str {
+        "stop"
     }
 }

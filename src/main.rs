@@ -71,6 +71,11 @@ fn try_main() -> Res<()> {
         }
     }
 
+    // STOP
+    else if let Some(_) = matches.subcommand_matches(app::Stop::name()) {
+        manager.stop_current();
+    }
+
     file_access.write(&manager)?;
     Ok(())
 }

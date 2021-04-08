@@ -97,6 +97,15 @@ impl Manager {
             self.current_task = Some(task.id)
         }
     }
+
+    pub fn stop_current(&mut self) {
+        if let Some(curr) = self.current_task {
+            if let Some(task) = self.task_mut(curr) {
+                task.stop();
+                self.current_task = None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -119,6 +128,7 @@ pub struct Task {
     id: usize,
     name: String,
     started_date: Option<i64>,
+    tracked: Option<i64>
 }
 
 impl Task {
@@ -126,12 +136,23 @@ impl Task {
         Task {
             id: id,
             name: name,
-            started_date: None
+            started_date: None,
+            tracked: None
         }
     }
 
     fn start(&mut self) {
         self.started_date = Some(Local::now().timestamp());
+    }
+
+    fn stop(&mut self) {
+        let tracked = self.tracked.unwrap_or(0);
+        if let Some(started) = self.started_date {
+            let now = Local::now().timestamp();
+            self.tracked = Some(tracked + (now - started));
+        }
+
+        self.started_date = None
     }
 }
 
@@ -140,7 +161,7 @@ impl Task {
 impl TableDisplay for Group {
     
     fn header(&self) -> Row {
-        row!["ID", "Task", "Date"]
+        row!["ID", "Task", "Started", "Time Tracked"]
     }
 
     fn rows(&self) -> Vec<Row> {
@@ -154,6 +175,11 @@ impl TableDisplay for Group {
                     &e.started_date
                         .map(|sd| sd.to_string())
                         .unwrap_or(String::from("STOPPED"))
+                ),
+                Cell::new(
+                    &e.tracked
+                        .map(|sd| sd.to_string())
+                        .unwrap_or(String::from("NONE"))
                 )
             ];
 
@@ -166,7 +192,7 @@ impl TableDisplay for Group {
 
 impl TableDisplay for Task {
     fn header(&self) -> Row {
-        row!["ID", "Task", "Date"]
+        row!["ID", "Task", "Started", "Time Tracked"]
     }
 
     fn rows(&self) -> Vec<Row> {
@@ -179,6 +205,11 @@ impl TableDisplay for Task {
                 &self.started_date
                     .map(|sd| sd.to_string())
                     .unwrap_or(String::from("STOPPED"))
+            ),
+            Cell::new(
+                &self.tracked
+                    .map(|sd| sd.to_string())
+                    .unwrap_or(String::from("NONE"))
             )
         ];
 
