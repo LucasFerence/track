@@ -91,20 +91,42 @@ impl Manager {
         None
     }
 
-    pub fn start_task(&mut self, task_id: usize) {
-        if let Some(task) = self.task_mut(task_id) {
-            task.start();
-            self.current_task = Some(task.id)
+    pub fn task(&self, task_id: usize) -> Option<&Task>{
+        for group in &self.groups {
+            for task in &group.tasks {
+                if task.id == task_id {
+                    return Some(task);
+                }
+            }
         }
+
+        None
     }
 
-    pub fn stop_current(&mut self) {
+    // Return the ID of the started task
+    pub fn start_task(&mut self, task_id: usize) -> Res<usize> {
+        if let Some(task) = self.task_mut(task_id) {
+            task.start();
+            self.current_task = Some(task.id);
+            return Ok(task_id);
+        }
+
+        Err(Box::from("Could not find task"))
+    }
+
+    // Return the ID of the stopped task
+    pub fn stop_current(&mut self) -> Res<usize> { 
         if let Some(curr) = self.current_task {
             if let Some(task) = self.task_mut(curr) {
                 task.stop();
-                self.current_task = None
+                let id = task.id;
+                self.current_task = None;
+
+                return Ok(id)
             }
         }
+
+        Err(Box::from("Could not find current task"))
     }
 }
 

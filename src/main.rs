@@ -67,13 +67,25 @@ fn try_main() -> Res<()> {
         let id = sub.value_of(app::StartValue::name()).unwrap();
 
         if let Some(parsed_id) = id.parse::<usize>().ok() {
-            manager.start_task(parsed_id);
+
+            let started_id = manager.start_task(parsed_id)?;
+
+            // If the task was successfully created, display it
+            if let Some(task) = manager.task(started_id) {
+                println!("Starting:");
+                table::display(task);
+            }
         }
     }
 
     // STOP
     else if let Some(_) = matches.subcommand_matches(app::Stop::name()) {
-        manager.stop_current();
+        let stopped_id = manager.stop_current()?;
+
+        if let Some(task) = manager.task(stopped_id) {
+            println!("Stopping:");
+            table::display(task);
+        }
     }
 
     file_access.write(&manager)?;
