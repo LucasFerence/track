@@ -16,10 +16,11 @@
 /// `track end {id}`
 
 use std::process;
+use chrono::Local;
 
 use track::Res;
 use track::app;
-use track::data;
+use track::manager;
 use track::table;
 use track::file::FileAccess;
 
@@ -32,75 +33,48 @@ fn main() {
 
 fn try_main() -> Res<()> {
     // Ensure the file is correct before we do anything
-    data::ensure_file()?;
+    manager::ensure_file()?;
 
+    // Get the file access and manager
+    let file_access = FileAccess::new();
+    let mut manager: manager::Manager = file_access.read()?;
+
+    // Get the gorup for today
+    let today_group = today();
+
+    // Match the input
     let matches = app::app().get_matches();
 
     // NEW
     if let Some(sub) = matches.subcommand_matches(app::New::name()) {
-
         // Can use unwrap because it is required
-        let value = sub.value_of(app::NewValue::name()).unwrap();
+        let task_name = sub.value_of(app::NewValue::name()).unwrap();
 
-        // Get file access and root
-        let file_access = FileAccess::new();
-        let mut root: data::Root = file_access.read()?;
-
-        // Create entry from input value
-        let entry = root.create_entry(value.to_owned());
-
-        // Either add task to current day, or create a new day
-        match root.today() {
-            Some(today) => {
-                today.add_entry(entry);
-            },
-            _ => {
-                let mut new_day = data::Day::new();
-                new_day.add_entry(entry);
-                root.add_day(new_day);
-            }
-        }
-
-        file_access.write(&root)?;
+        // Add the task to todays group
+        manager.add_task(today_group, task_name.to_owned());
     }
 
     // REPORT
-    if let Some(_) = matches.subcommand_matches(app::Report::name()) {
-        // Show the current day
-
-        // Get file access and root
-        let file_access = FileAccess::new();
-        let mut root: data::Root = file_access.read()?;
-
-        if let Some(today) = root.today() {
+    else if let Some(_) = matches.subcommand_matches(app::Report::name()) {
+        if let Some(today) = manager.group(&today_group) {
             table::display(today);
         }
     }
 
     // START
-    if let Some(sub) = matches.subcommand_matches(app::Start::name()) {
-
+    else if let Some(sub) = matches.subcommand_matches(app::Start::name()) {
         // Can use unwrap because it is required
         let id = sub.value_of(app::StartValue::name()).unwrap();
 
-        // Get file access and root
-        let file_access = FileAccess::new();
-        let mut root: data::Root = file_access.read()?;
-
-        // Find the entry in the current day with the ID
-        let found_entry = root.today()
-            .map(|today| today.find_by_id(id))
-            .unwrap_or_default();
-
-        if let Some(fe) = found_entry {
-            fe.start();
-
-            println!("Started:");
-            table::display(fe);
-
-            file_access.write(&root)?;
+        if let Some(parsed_id) = id.parse::<usize>().ok() {
+            manager.start_task(parsed_id);
         }
     }
 
+    file_access.write(&manager)?;
     Ok(())
+}
+
+fn today() -> String {
+    Local::now().date().to_string()
 }
