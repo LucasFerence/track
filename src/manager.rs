@@ -180,7 +180,6 @@ impl Task {
 
 // --- Table Display ---
 
-// TODO: I would like to move this TableDisplay stuff out of this file
 impl TableDisplay for Group {
     
     fn header(&self) -> Row {
@@ -189,53 +188,8 @@ impl TableDisplay for Group {
 
     fn rows(&self) -> Vec<Row> {
         let mut rows: Vec<Row> = Vec::new();
-
-        // Will apply a style if `should` is true
-        let style = |cell: Cell, should: bool| -> Cell {
-            if should {
-                return cell
-                    .with_style(Attr::Bold)
-                    .with_style(Attr::ForegroundColor(color::BRIGHT_RED));
-            }
-
-            cell
-        };
-
         for e in &self.tasks {  
-            let is_started = e.started_date.is_some();
-
-            let v = vec![
-                style(Cell::new(&e.id.to_string()), is_started),
-                style(Cell::new(&e.name), is_started),
-                style(Cell::new(
-                    &e.started_date
-                        .map(|sd| {
-                            // This definitely needs to be refactored
-                            if let Some(dt) = time::to_datetime(sd) {
-                                return dt.to_string();
-                            }
-
-                            return String::new();
-                        })
-                        .unwrap_or(String::from("STOPPED"))
-                ), is_started),
-                style(Cell::new(
-                    // Use started time (its running) or else tracked (if its stopped)
-                    &e.started_date
-                        .map(|sd| {
-                            
-                            let tracked = e.tracked.unwrap_or(0);
-                            let now = time::timestamp();
-                            // now minus sd plus tracked
-                            
-                            time::duration_str(tracked + (now - sd))
-                        })
-                        .or_else(|| e.tracked.map(|sd| time::duration_str(sd)))
-                        .unwrap_or(String::from("NONE"))
-                ), is_started)
-            ];
-
-            rows.push(Row::new(v));
+            rows.append(&mut e.rows());
         }
 
         rows
@@ -250,10 +204,22 @@ impl TableDisplay for Task {
     fn rows(&self) -> Vec<Row> {
         let mut rows: Vec<Row> = Vec::new();
 
+        let is_started = self.started_date.is_some();
+
+        let style = |cell: Cell| -> Cell {
+            if is_started {
+                return cell
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::BRIGHT_RED));
+            }
+
+            cell
+        };
+
         let v = vec![
-            Cell::new(&self.id.to_string()),
-            Cell::new(&self.name),
-            Cell::new(
+            style(Cell::new(&self.id.to_string())),
+            style(Cell::new(&self.name)),
+            style(Cell::new(
                 &self.started_date
                     .map(|sd| {
                         // This definitely needs to be refactored
@@ -264,8 +230,8 @@ impl TableDisplay for Task {
                         return String::new();
                     })
                     .unwrap_or(String::from("STOPPED"))
-            ),
-            Cell::new(
+            )),
+            style(Cell::new(
                 &self.started_date
                         .map(|sd| {
                             
@@ -277,7 +243,7 @@ impl TableDisplay for Task {
                         })
                         .or_else(|| self.tracked.map(|sd| time::duration_str(sd)))
                         .unwrap_or(String::from("NONE"))
-            )
+            ))
         ];
 
         rows.push(Row::new(v));
