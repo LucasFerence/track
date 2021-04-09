@@ -1,20 +1,3 @@
-/// Use:
-/// 
-/// To add new task -> return ID
-/// `track new "This is a custom daily task"`
-/// 
-/// To remove task
-/// `track remove {id}`
-/// 
-/// Show existing tasks with IDs, and time tracked for each
-/// `track report`
-/// 
-/// Begin tracking a specific task
-/// `track start {id}`
-/// 
-/// End tracking a specific task -> return time active
-/// `track end {id}`
-
 use std::process;
 
 use track::Res;
@@ -54,6 +37,15 @@ fn try_main() -> Res<()> {
         manager.add_task(today_group, task_name.to_owned());
     }
 
+    // REMOVE
+    else if let Some(sub) = matches.subcommand_matches(app::Remove::name()) {
+        let id = sub.value_of(app::RemoveValue::name())
+            .unwrap()
+            .parse::<usize>()?;
+
+        manager.remove_task(id);
+    }
+
     // REPORT
     else if let Some(_) = matches.subcommand_matches(app::Report::name()) {
         if let Some(today) = manager.group(&today_group) {
@@ -64,17 +56,16 @@ fn try_main() -> Res<()> {
     // START
     else if let Some(sub) = matches.subcommand_matches(app::Start::name()) {
         // Can use unwrap because it is required
-        let id = sub.value_of(app::StartValue::name()).unwrap();
+        let id = sub.value_of(app::StartValue::name())
+            .unwrap()
+            .parse::<usize>()?;
 
-        if let Some(parsed_id) = id.parse::<usize>().ok() {
+        let started_id = manager.start_task(id)?;
 
-            let started_id = manager.start_task(parsed_id)?;
-
-            // If the task was successfully created, display it
-            if let Some(task) = manager.task(started_id) {
-                println!("Starting:");
-                table::display(task);
-            }
+        // If the task was successfully created, display it
+        if let Some(task) = manager.task(started_id) {
+            println!("Starting:");
+            table::display(task);
         }
     }
 

@@ -5,6 +5,7 @@ pub fn app() -> App<'static, 'static> {
         .version(crate_version!())
         .author(crate_authors!())
         .subcommand(New::create())
+        .subcommand(Remove::create())
         .subcommand(Report::create())
         .subcommand(Start::create())
         .subcommand(Stop::create())
@@ -34,6 +35,33 @@ impl NewValue {
 
     pub fn name() -> &'static str {
         "new-value"
+    }
+}
+
+// --- REMOVE COMMAND ---
+
+pub struct Remove;
+impl Remove {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+            .arg(RemoveValue::create())
+    }
+
+    pub fn name() -> &'static str {
+        "remove"
+    }
+}
+
+pub struct RemoveValue;
+impl RemoveValue {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .required(true)
+            .index(1)
+    }
+
+    pub fn name() -> &'static str {
+        "remove-value"
     }
 }
 

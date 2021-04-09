@@ -59,28 +59,22 @@ impl Manager {
 
         None
     }
+
+    fn group_for_task_mut(&mut self, task_id: usize) -> (Option<&mut Group>, usize) {
+        for group in &mut self.groups {
+            for (i, task) in &mut group.tasks.iter().enumerate() {
+                if task.id == task_id {
+                    return (Some(group), i);
+                }
+            }
+        }
+
+        (None, 0)
+    }
 }
 
 /// Public methods
 impl Manager {
-    pub fn add_task(&mut self, group_name: String, task_name: String) {
-        let task = Task::new(self.next_id, task_name);
-        self.next_id += 1;
-
-        // Find a group if you can, and add the task to it
-        // Otherwise, just create a new one
-        match self.group_mut(&group_name) {
-            Some(group) => {
-                group.tasks.push(task);
-            },
-            None => {
-                let mut group = Group::new(group_name);
-                group.tasks.push(task);
-                self.groups.push(group);
-            }
-        }
-    }
-
     pub fn group(&self, group_name: &String) -> Option<&Group> {
         for group in &self.groups {
             if group.name == *group_name {
@@ -103,8 +97,42 @@ impl Manager {
         None
     }
 
+    pub fn add_task(&mut self, group_name: String, task_name: String) {
+        let task = Task::new(self.next_id, task_name);
+        self.next_id += 1;
+
+        // Find a group if you can, and add the task to it
+        // Otherwise, just create a new one
+        match self.group_mut(&group_name) {
+            Some(group) => {
+                group.tasks.push(task);
+            },
+            None => {
+                let mut group = Group::new(group_name);
+                group.tasks.push(task);
+                self.groups.push(group);
+            }
+        }
+    }
+
+    pub fn remove_task(&mut self, task_id: usize) {
+        if let (Some(group), index) = self.group_for_task_mut(task_id) {
+            group.tasks.remove(index);
+
+            if let Some(curr) = self.current_task {
+                if curr == task_id {
+                    self.current_task = None;
+                }
+            }
+        }
+    }
+
     // Return the ID of the started task
     pub fn start_task(&mut self, task_id: usize) -> Res<usize> {
+        if self.current_task.is_some() {
+            self.stop_current()?;
+        }
+
         if let Some(task) = self.task_mut(task_id) {
             task.start();
             self.current_task = Some(task.id);
