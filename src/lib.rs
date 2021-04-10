@@ -1,5 +1,5 @@
 mod common;
-pub use common::Res;
+pub use common::{Res, ResErr};
 
 pub mod app;
 pub mod file;

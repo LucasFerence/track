@@ -34,7 +34,11 @@ fn try_main() -> Res<()> {
         let task_name = sub.value_of(app::NewValue::name()).unwrap();
 
         // Add the task to todays group
-        manager.add_task(today_group, task_name.to_owned());
+        let new_task = manager.add_task(today_group, task_name.to_owned())?;
+
+        // Display
+        println!("Added:");
+        table::display(&new_task);
     }
 
     // REMOVE
@@ -43,7 +47,11 @@ fn try_main() -> Res<()> {
             .unwrap()
             .parse::<usize>()?;
 
-        manager.remove_task(id);
+        let removed_task = manager.remove_task(today_group, id)?;
+
+        // Display
+        println!("Removed:");
+        table::display(&removed_task);
     }
 
     // REPORT
@@ -60,23 +68,18 @@ fn try_main() -> Res<()> {
             .unwrap()
             .parse::<usize>()?;
 
-        let started_id = manager.start_task(id)?;
+        let started_task = manager.start_task(id)?;
 
-        // If the task was successfully created, display it
-        if let Some(task) = manager.task(started_id) {
-            println!("Starting:");
-            table::display(task);
-        }
+        println!("Starting:");
+        table::display(&started_task);
     }
 
     // STOP
     else if let Some(_) = matches.subcommand_matches(app::Stop::name()) {
-        let stopped_id = manager.stop_current()?;
+        let stopped_task = manager.stop_current()?;
 
-        if let Some(task) = manager.task(stopped_id) {
-            println!("Stopping:");
-            table::display(task);
-        }
+        println!("Stopping:");
+        table::display(&stopped_task);
     }
 
     file_access.write(&manager)?;
