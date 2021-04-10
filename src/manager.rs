@@ -269,14 +269,9 @@ impl TableDisplay for Task {
             style(Cell::new(&self.name)),
             style(Cell::new(
                 &self.started_date
-                    .map(|sd| {
-                        // This definitely needs to be refactored
-                        if let Some(dt) = time::to_datetime(sd) {
-                            return dt.to_string();
-                        }
-
-                        return String::new();
-                    })
+                    .map(|sd| time::to_local_datetime(sd)
+                        .format("%B %e %r %Y")
+                        .to_string())
                     .unwrap_or(String::from("STOPPED"))
             )),
             style(Cell::new(

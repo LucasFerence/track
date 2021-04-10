@@ -1,3 +1,9 @@
+///
+/// TODO:
+/// 1. Allow use of other group names rather than current day
+/// 2. Allow archiving current file or opening an archive file
+/// 3. Add complete/uncomplete functionality
+
 use std::process;
 
 use track::Res;
