@@ -1,7 +1,11 @@
-use chrono::{offset::TimeZone, DateTime, Utc, Local, NaiveDateTime, Duration};
+use chrono::{offset::TimeZone, DateTime, Utc, Local, NaiveDateTime, Duration, Date};
 
-pub fn today_date() -> String {
-    Utc::now().date().to_string()
+pub fn today() -> Date<Utc> {
+    Utc::now().date()
+}
+
+pub fn today_local() -> Date<Local> {
+    today().with_timezone(&Local)
 }
 
 pub fn timestamp() -> i64 {

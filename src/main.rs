@@ -28,8 +28,11 @@ fn try_main() -> Res<()> {
     let file_access = FileAccess::new();
     let mut manager: manager::Manager = file_access.read()?;
 
-    // Get the gorup for today
-    let today_group = time::today_date();
+    // Get the gorup for today.
+    // Want it to be local so it changes when expected
+    let today_group = time::today_local()
+        .format("%F")
+        .to_string();
 
     // Match the input
     let matches = app::app().get_matches();
