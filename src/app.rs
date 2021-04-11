@@ -12,6 +12,7 @@ pub fn app() -> App<'static, 'static> {
         .subcommand(Start::create())
         .subcommand(Stop::create())
         .subcommand(Tomorrow::create())
+        .subcommand(Complete::create())
 }
 
 // --- NEW SUBCOMMAND ---
@@ -183,5 +184,44 @@ impl Tomorrow {
 
     pub fn name() -> &'static str {
         "tmrw"
+    }
+}
+
+// --- COMPLETE SUBCOMMAND ---
+
+pub struct Complete;
+impl Complete {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+            .arg(CompleteValue::create())
+            .arg(CompleteCurrent::create())
+    }
+
+    pub fn name() -> &'static str {
+        "complete"
+    }
+}
+
+pub struct CompleteValue;
+impl CompleteValue {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .index(1)
+    }
+
+    pub fn name() -> &'static str {
+        "complete-value"
+    }
+}
+
+pub struct CompleteCurrent;
+impl CompleteCurrent {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .short("c")
+    }
+
+    pub fn name() -> &'static str {
+        "complete-curr"
     }
 }

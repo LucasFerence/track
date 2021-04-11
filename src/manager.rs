@@ -189,7 +189,37 @@ impl Manager {
         Ok(clone)
     }
 
+    /// Completes a task with an optional task_id.
+    /// If task_id is None, then it is assumed to be completing
+    /// the current task.
+    /// 
+    /// NOTE: The returned Task is a clone, implying that it
+    /// cannot be used to modify the existing data structure.
+    pub fn complete_task(&mut self, task_id: Option<usize>) -> Res<Task> {
+        // Get the task_id to process, or error if there isn't one
+        let id = task_id
+            .or_else(|| self.current_task)
+            .ok_or(ResErr::from("No task or current task!"))?;
+        
+        // Get the task from the resolved group
+        let group = self.resolve_group()?;
+        let task = group.task_mut(id)
+            .ok_or(ResErr::from("Could not find task in group!"))?;
+
+        task.complete();
+        // Make sure to clone afterwards so the returned value is up to date
+        let clone = task.clone();
+        
+        Ok(clone)
+    }
+
+    /// Creates/adds a group to the manager with the name: name
+    /// Will not create groups with duplicate names!
     pub fn add_group(&mut self, name: String) -> Res<Group> {
+        // Avoid duplicate named groups
+        // Technically they could be supported (since groups have an ID)
+        // but it would likely break the default group behavior
+        // and would be generally confusing
         if self.group_by_name(&name).is_some() {
             return Err(ResErr::from("Group already exists"));
         }
@@ -306,7 +336,8 @@ pub struct Task {
     id: usize,
     name: String,
     started_date: Option<i64>,
-    tracked: Option<i64>
+    tracked: Option<i64>,
+    is_complete: bool
 }
 
 impl Task {
@@ -315,7 +346,8 @@ impl Task {
             id: id,
             name: name,
             started_date: None,
-            tracked: None
+            tracked: None,
+            is_complete: false
         }
     }
 
@@ -323,6 +355,9 @@ impl Task {
     /// This timestamp represents the time a task started in its current run
     fn start(&mut self) {
         self.started_date = Some(time::timestamp());
+
+        // Un-complete the task if it is started
+        self.is_complete = false;
     }
 
     /// Stop the task.
@@ -337,6 +372,14 @@ impl Task {
         }
 
         self.started_date = None
+    }
+
+    /// Complete the task
+    /// Will the stop the current task, and mark as cimplete
+    fn complete(&mut self) {
+        // Stop the task (it could be currently running)
+        self.stop();
+        self.is_complete = true;
     }
 }
 
@@ -411,15 +454,26 @@ impl TableDisplay for Task {
         let mut rows: Vec<Row> = Vec::new();
 
         let is_started = self.started_date.is_some();
+        let is_complete = self.is_complete;
 
         let style = |cell: Cell| -> Cell {
-            if is_started {
+            if is_complete {
+                return cell
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::BRIGHT_GREEN));
+            } else if is_started {
                 return cell
                     .with_style(Attr::Bold)
                     .with_style(Attr::ForegroundColor(color::BRIGHT_RED));
             }
 
             cell
+        };
+
+        // Display complete/stopped depending on the complete status
+        // of the task
+        let started_display = || -> String {
+            return if is_complete { String::from("COMPLETE") } else { String::from("STOPPED") }
         };
 
         let v = vec![
@@ -430,7 +484,7 @@ impl TableDisplay for Task {
                     .map(|sd| time::to_local_datetime(sd)
                         .format("%B %e %r %Y")
                         .to_string())
-                    .unwrap_or(String::from("STOPPED"))
+                    .unwrap_or(started_display())
             )),
             style(Cell::new(
                 &self.started_date

@@ -1,7 +1,6 @@
 ///
 /// TODO:
 /// 1. Allow archiving current file or opening an archive file
-/// 2. Add complete/uncomplete functionality
 
 use std::process;
 
@@ -104,6 +103,7 @@ fn try_main() -> Res<()> {
 
     // TOMORROW
     else if let Some(_) = matches.subcommand_matches(app::Tomorrow::name()) {
+        // Get the tomorrow name, which we will use as the new group name.
         let tomorrow = time::tomorrow_local()
             .format(manager::DATE_FORMAT)
             .to_string();
@@ -115,6 +115,26 @@ fn try_main() -> Res<()> {
         
         manager.use_group(group.id())?;
         println!("Using group: {}", group_name);
+    }
+
+    // COMPLETE
+    else if let Some(sub) = matches.subcommand_matches(app::Complete::name()) {
+        
+        // If we want to process current, do that
+        if sub.occurrences_of(app::CompleteCurrent::name()) > 0 {
+            let task = manager.complete_task(None)?;
+            println!("Completed curent:");
+            table::display(&task);
+        } else {
+            // Otherwise an ID should have been passed or it was an invalid command
+            let id = sub.value_of(app::CompleteValue::name())
+                .ok_or(ResErr::from("Invalid command"))?
+                .parse::<usize>()?;
+
+            let task = manager.complete_task(Some(id))?;
+            println!("Completed:");
+            table::display(&task);
+        }
     }
 
     manager.commit()
