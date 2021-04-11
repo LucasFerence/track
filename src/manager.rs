@@ -1,3 +1,8 @@
+///
+/// Manager should be used to interfact directly with the data file
+/// to perform all core project actions.
+/// 
+
 use serde::{Serialize, Deserialize};
 use prettytable::{Attr, color, Cell, Row, row, cell};
 
@@ -6,6 +11,11 @@ use crate::{Res, ResErr};
 use crate::table::TableDisplay;
 use crate::time;
 
+/// Get the name of the default group, being the local date of today
+/// 
+/// The value returned from this method should be unique. The uniqueness
+/// of this value will NOT be enforced elsewhere.
+/// A non-unique value will likely cause unexpected behavior
 fn default_group_name() -> String {
     time::today_local().format("%m-%d-%Y").to_string()
 }
@@ -22,8 +32,13 @@ pub struct Manager {
     groups: Vec<Group>
 }
 
+/// INIT
 impl Manager {
 
+    /// Initializes the manager and its file existence.
+    /// 
+    /// This method will return OK if the file/manager is prepared
+    /// and operations can be performed safely
     pub fn init() -> Res<Manager> {
         let file_access = FileAccess::new();
 
@@ -37,6 +52,7 @@ impl Manager {
         // Ensure that there is a default group
         let name = default_group_name();
         if manager.group_by_name(&name).is_none() {
+
             let new_group = Group::new(manager.next_group, name);
             manager.next_group += 1;
             manager.groups.push(new_group);
@@ -47,6 +63,7 @@ impl Manager {
         Ok(manager)
     }
 
+    /// Commit the manager to the file
     pub fn commit(&self) -> Res<()> {
         let file_access = FileAccess::new();
         file_access.write(self)?;
@@ -55,64 +72,19 @@ impl Manager {
     }
 }
 
-/// Private methods
-impl Manager {
-    /// Create a base manager. 
-    /// This will likely only be called once, and then is on file creation
-    fn new() -> Self {
-        Manager {
-            next_task: 1,
-            next_group: 1,
-            current_task: None,
-            current_group: None,
-            groups: Vec::new()
-        }
-    }
-    
-    fn group_by_id(&mut self, group_id: usize) -> Option<&mut Group> {
-        for group in &mut self.groups {
-            if group.id == group_id {
-                return Some(group);
-            }
-        }
-
-        None
-    }
-
-    fn group_by_name(&mut self, group_name: &String) -> Option<&mut Group> {
-        for group in &mut self.groups {
-            if group.name == *group_name {
-                return Some(group);
-            }
-        }
-
-        None
-    }
-
-    fn resolve_group(&mut self) -> Res<&mut Group> {
-        match self.current_group {
-            Some(curr) => {
-                return self.group_by_id(curr)
-                    .ok_or(ResErr::from("Could not resolve existing group!"))
-            },
-            _ => {
-                let name = default_group_name();
-                return self.group_by_name(&name)
-                    .ok_or(ResErr::from("Could not resolve default group!"));
-            }
-        }
-    }
-}
-
-/// Public methods
+/// PUBLIC API
 impl Manager {
 
+    /// Get current group by resolving.
+    /// Will return OK if the group resolved correctly
     pub fn group(&mut self) -> Res<&Group> {
         Ok(self.resolve_group()?)
     }
 
-    /// Add a task with the task_name to the group with group_name
-    /// Return a Res<Task>. The returned Task is a clone, implying that it
+    /// Add a task with name: task_name
+    /// Return OK if the task was created/added sucessfully
+    /// 
+    /// NOTE: The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
     pub fn add_task(&mut self, task_name: String) -> Res<Task> {
         let task = Task::new(self.next_task, task_name);
@@ -127,8 +99,10 @@ impl Manager {
         Ok(clone)
     }
 
-    /// Remove a task with id: task_id from the group with name: group_name
-    /// Return a Res<Task>. The returned Task is a clone, implying that it
+    /// Remove a task with id: task_id
+    /// Return OK if the task was removed sucessfully
+    /// 
+    /// NOTE: The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
     pub fn remove_task(&mut self, task_id: usize) -> Res<Task> {
         let group = self.resolve_group()?;
@@ -145,6 +119,11 @@ impl Manager {
         Ok(clone)
     }
 
+    /// Change the current group to operate on identified by group_id
+    /// Return OK if the group was selected as current sucessfully
+    /// 
+    /// NOTE: The returned Group is a clone, implying that it
+    /// cannot be used to modify the existing data structure.
     pub fn use_group(&mut self, group_id: usize) -> Res<Group> {
         let group = self.group_by_id(group_id)
             .ok_or(ResErr::from("Could not find group!"))?;
@@ -155,8 +134,10 @@ impl Manager {
         Ok(clone)
     }
 
+    /// Reset the current group to None.
+    /// By resetting, the operating group will be whatever is
+    /// defined by default_group_name()
     pub fn reset_group(&mut self) {
-        // Just reset the group (none)
         self.current_group = None;
     }
 
@@ -185,10 +166,13 @@ impl Manager {
         Ok(clone)        
     }
 
-    /// Stop the current running task
-    /// Return a Res<Task>. The returned Task is a clone, implying that it
+    /// Stop the current running task in the operating group
+    /// Return OK if the current task was stopped sucessfully
+    /// 
+    /// NOTE: The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
     pub fn stop_current(&mut self) -> Res<Task> {
+        // Copy this out to avoid duplicate muts
         let current = self.current_task;
 
         let group = self.resolve_group()?;
@@ -209,6 +193,64 @@ impl Manager {
     }
 }
 
+/// PRIVATE
+impl Manager {
+    /// Create a base manager. 
+    /// This will likely only be called once, and then is on file creation
+    fn new() -> Self {
+        Manager {
+            next_task: 1,
+            next_group: 1,
+            current_task: None,
+            current_group: None,
+            groups: Vec::new()
+        }
+    }
+    
+    /// Get a mut group by searching by ID
+    fn group_by_id(&mut self, group_id: usize) -> Option<&mut Group> {
+        for group in &mut self.groups {
+            if group.id == group_id {
+                return Some(group);
+            }
+        }
+
+        None
+    }
+
+    /// Get a mut group by searching by name
+    fn group_by_name(&mut self, group_name: &String) -> Option<&mut Group> {
+        for group in &mut self.groups {
+            if group.name == *group_name {
+                return Some(group);
+            }
+        }
+
+        None
+    }
+
+    /// Resolve the current group.
+    /// This method assumes the default group already exists,
+    /// and it will NOT create it on the fly.
+    fn resolve_group(&mut self) -> Res<&mut Group> {
+        match self.current_group {
+            Some(curr) => {
+                // Find the current group
+                return self.group_by_id(curr)
+                    .ok_or(ResErr::from("Could not resolve existing group!"))
+            },
+            _ => {
+                // Find the default group using the group_name()
+                let name = default_group_name();
+                return self.group_by_name(&name)
+                    .ok_or(ResErr::from("Could not resolve default group!"));
+            }
+        }
+    }
+}
+
+/// Holds a vector of Tasks
+/// Identified by ID
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Group {
     id: usize,
@@ -241,6 +283,9 @@ impl Group {
     }
 }
 
+/// Represents an individual task to complete.
+/// Holds data necessary in computing time tracked
+/// for a task
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Task {
     id: usize,
@@ -259,12 +304,18 @@ impl Task {
         }
     }
 
+    /// Give the Task a timestamp as started_date
+    /// This timestamp represents the time a task started in its current run
     fn start(&mut self) {
         self.started_date = Some(time::timestamp());
     }
 
+    /// Stop the task.
+    /// This will erase the started_date timestamp and
+    /// append tracked time to the tracked field
     fn stop(&mut self) {
         let tracked = self.tracked.unwrap_or(0);
+
         if let Some(started) = self.started_date {
             let now = time::timestamp();
             self.tracked = Some(tracked + (now - started));
@@ -274,8 +325,8 @@ impl Task {
     }
 }
 
+/// Compare tasks by their ID
 impl PartialEq for Task {
-    
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
