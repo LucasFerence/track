@@ -7,7 +7,7 @@ use crate::table::TableDisplay;
 use crate::time;
 
 fn default_group_name() -> String {
-    time::today_local().format("%F").to_string()
+    time::today_local().format("%m-%d-%Y").to_string()
 }
 
 // --- DATA STRUCTS ---
@@ -304,9 +304,9 @@ impl TableDisplay for Manager {
         };
 
         for g in &self.groups {  
-            let is_current = self.current_group
-                .filter(|curr| *curr == g.id)
-                .is_some();
+            let is_current =
+            self.current_group.filter(|curr| *curr == g.id).is_some()
+                || (g.name == default_group_name() && self.current_group.is_none());
 
             let v = vec![
                 style(Cell::new(&g.id.to_string()), is_current),

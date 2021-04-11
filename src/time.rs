@@ -5,7 +5,7 @@ pub fn today() -> Date<Utc> {
 }
 
 pub fn today_local() -> Date<Local> {
-    today().with_timezone(&Local)
+    Utc::now().with_timezone(&Local).date()
 }
 
 pub fn timestamp() -> i64 {
