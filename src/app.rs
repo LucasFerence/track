@@ -11,6 +11,7 @@ pub fn app() -> App<'static, 'static> {
         .subcommand(Use::create())
         .subcommand(Start::create())
         .subcommand(Stop::create())
+        .subcommand(Tomorrow::create())
 }
 
 // --- NEW SUBCOMMAND ---
@@ -169,5 +170,18 @@ impl Stop {
 
     pub fn name() -> &'static str {
         "stop"
+    }
+}
+
+// --- TOMORROW SUBCOMMAND ---
+
+pub struct Tomorrow;
+impl Tomorrow {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+    }
+
+    pub fn name() -> &'static str {
+        "tmrw"
     }
 }

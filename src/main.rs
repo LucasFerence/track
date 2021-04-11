@@ -6,10 +6,11 @@
 
 use std::process;
 
-use track::Res;
+use track::{Res, ResErr};
 use track::app;
 use track::manager;
 use track::table;
+use track::time;
 
 fn main() {
     if let Err(err) = try_main() {
@@ -71,7 +72,7 @@ fn try_main() -> Res<()> {
             println!("Resetting group...")
         } else {
             let id = sub.value_of(app::UseValue::name())
-                .unwrap()
+                .ok_or(ResErr::from("Invalid command"))?
                 .parse::<usize>()?;
 
             manager.use_group(id)?;
@@ -100,6 +101,21 @@ fn try_main() -> Res<()> {
 
         println!("Stopping:");
         table::display(&stopped_task);
+    }
+
+    // TOMORROW
+    else if let Some(_) = matches.subcommand_matches(app::Tomorrow::name()) {
+        let tomorrow = time::tomorrow_local()
+            .format(manager::DATE_FORMAT)
+            .to_string();
+
+        let group = manager.add_group(tomorrow)?;
+        let group_name = group.name();
+
+        println!("Added group: {}", group_name);
+        
+        manager.use_group(group.id())?;
+        println!("Using group: {}", group_name);
     }
 
     manager.commit()

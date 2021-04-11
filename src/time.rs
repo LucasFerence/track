@@ -8,6 +8,10 @@ pub fn today_local() -> Date<Local> {
     Utc::now().with_timezone(&Local).date()
 }
 
+pub fn tomorrow_local() -> Date<Local> {
+    today_local() + Duration::days(1)
+}
+
 pub fn timestamp() -> i64 {
     Utc::now().timestamp()
 }

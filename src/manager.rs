@@ -11,13 +11,15 @@ use crate::{Res, ResErr};
 use crate::table::TableDisplay;
 use crate::time;
 
+pub const DATE_FORMAT: &str = "%m-%d-%Y";
+
 /// Get the name of the default group, being the local date of today
 /// 
 /// The value returned from this method should be unique. The uniqueness
 /// of this value will NOT be enforced elsewhere.
 /// A non-unique value will likely cause unexpected behavior
 fn default_group_name() -> String {
-    time::today_local().format("%m-%d-%Y").to_string()
+    time::today_local().format(DATE_FORMAT).to_string()
 }
 
 // --- DATA STRUCTS ---
@@ -50,13 +52,8 @@ impl Manager {
         let mut manager: Manager = file_access.read()?;
 
         // Ensure that there is a default group
-        let name = default_group_name();
-        if manager.group_by_name(&name).is_none() {
-
-            let new_group = Group::new(manager.next_group, name);
-            manager.next_group += 1;
-            manager.groups.push(new_group);
-
+        let res = manager.add_group(default_group_name());
+        if res.is_ok() {
             file_access.write(&manager)?;
         }
 
@@ -191,6 +188,20 @@ impl Manager {
 
         Ok(clone)
     }
+
+    pub fn add_group(&mut self, name: String) -> Res<Group> {
+        if self.group_by_name(&name).is_some() {
+            return Err(ResErr::from("Group already exists"));
+        }
+
+        let new_group = Group::new(self.next_group, name);
+        let clone = new_group.clone();
+
+        self.next_group += 1;
+        self.groups.push(new_group);
+
+        Ok(clone)
+    }
 }
 
 /// PRIVATE
@@ -280,6 +291,10 @@ impl Group {
 
     pub fn name(&self) -> &String {
         &self.name
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 }
 
