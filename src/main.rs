@@ -68,6 +68,7 @@ fn try_main() -> Res<()> {
         if sub.occurrences_of(app::UseReset::name()) > 0 {
             // If we want to reset the used group, it will make it whatever today is
             manager.reset_group();
+            println!("Resetting group...")
         } else {
             let id = sub.value_of(app::UseValue::name())
                 .unwrap()
@@ -75,6 +76,9 @@ fn try_main() -> Res<()> {
 
             manager.use_group(id)?;
         }
+
+        let group = manager.group()?;
+        println!("Using group: {}", group.name());
     }
 
     // START
