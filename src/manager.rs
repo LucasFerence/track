@@ -6,16 +6,8 @@ use crate::{Res, ResErr};
 use crate::table::TableDisplay;
 use crate::time;
 
-// Ensure the file exists
-pub fn ensure_file() -> Res<()> {
-    let file_access = FileAccess::new();
-
-    // Create it if it doesn't exist
-    if !file_access.exists() {
-        file_access.write(&Manager::new())?;
-    }
-
-    Ok(())
+fn default_group_name() -> String {
+    time::today_local().format("%F").to_string()
 }
 
 // --- DATA STRUCTS ---
@@ -23,26 +15,71 @@ pub fn ensure_file() -> Res<()> {
 /// Manages groups of tasks
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Manager {
-    next_id: usize,
+    next_task: usize,
     current_task: Option<usize>,
+    next_group: usize,
+    current_group: Option<usize>,
     groups: Vec<Group>
+}
+
+impl Manager {
+
+    pub fn init() -> Res<Manager> {
+        let file_access = FileAccess::new();
+
+        // Ensure the file exists
+        if !file_access.exists() {
+            file_access.write(&Manager::new())?;
+        }
+
+        let mut manager: Manager = file_access.read()?;
+
+        // Ensure that there is a default group
+        let name = default_group_name();
+        if manager.group_by_name(&name).is_none() {
+            let new_group = Group::new(manager.next_group, name);
+            manager.next_group += 1;
+            manager.groups.push(new_group);
+
+            file_access.write(&manager)?;
+        }
+
+        Ok(manager)
+    }
+
+    pub fn commit(&self) -> Res<()> {
+        let file_access = FileAccess::new();
+        file_access.write(self)?;
+
+        Ok(())
+    }
 }
 
 /// Private methods
 impl Manager {
-
     /// Create a base manager. 
     /// This will likely only be called once, and then is on file creation
     fn new() -> Self {
         Manager {
-            next_id: 1,
+            next_task: 1,
+            next_group: 1,
             current_task: None,
+            current_group: None,
             groups: Vec::new()
         }
     }
     
-    /// Get the group with name: group_name as mutable
-    fn group_mut(&mut self, group_name: &String) -> Option<&mut Group> {
+    fn group_by_id(&mut self, group_id: usize) -> Option<&mut Group> {
+        for group in &mut self.groups {
+            if group.id == group_id {
+                return Some(group);
+            }
+        }
+
+        None
+    }
+
+    fn group_by_name(&mut self, group_name: &String) -> Option<&mut Group> {
         for group in &mut self.groups {
             if group.name == *group_name {
                 return Some(group);
@@ -52,53 +89,40 @@ impl Manager {
         None
     }
 
-    /// Get the task with id: task_id as mutable
-    fn task_mut(&mut self, task_id: usize) -> Option<&mut Task> {
-        for group in &mut self.groups {
-            for task in &mut group.tasks {
-                if task.id == task_id {
-                    return Some(task);
-                }
+    fn resolve_group(&mut self) -> Res<&mut Group> {
+        match self.current_group {
+            Some(curr) => {
+                return self.group_by_id(curr)
+                    .ok_or(ResErr::from("Could not resolve existing group!"))
+            },
+            _ => {
+                let name = default_group_name();
+                return self.group_by_name(&name)
+                    .ok_or(ResErr::from("Could not resolve default group!"));
             }
         }
-
-        None
     }
 }
 
 /// Public methods
 impl Manager {
 
-    // -- External access methods --
-
-    /// Get the group with name: group_name
-    pub fn group(&mut self, group_name: &String) -> Option<&Group> {
-        Some(self.group_mut(group_name)?)
+    pub fn group(&mut self) -> Res<&Group> {
+        Ok(self.resolve_group()?)
     }
-
-    /// Get the task with id: task_id
-    pub fn task(&mut self, task_id: usize) -> Option<&Task> {
-        Some(self.task_mut(task_id)?)
-    }
-
-    // -- Mutator methods --
 
     /// Add a task with the task_name to the group with group_name
     /// Return a Res<Task>. The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
-    pub fn add_task(&mut self, group_name: String, task_name: String) -> Res<Task> {
-        let task = Task::new(self.next_id, task_name);
+    pub fn add_task(&mut self, task_name: String) -> Res<Task> {
+        let task = Task::new(self.next_task, task_name);
         let clone = task.clone();
         
         // Ensure the next_id is ready for the next addition
-        self.next_id += 1;
+        self.next_task += 1;
 
-        // Find a group if you can, and add the task to it
-        // Otherwise, just create a new one
-        match self.group_mut(&group_name) {
-            Some(group) => group.tasks.push(task),
-            _ => self.groups.push(Group::new(group_name, task))
-        }
+        let group = self.resolve_group()?;
+        group.tasks.push(task);
 
         Ok(clone)
     }
@@ -106,14 +130,12 @@ impl Manager {
     /// Remove a task with id: task_id from the group with name: group_name
     /// Return a Res<Task>. The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
-    pub fn remove_task(&mut self, group_name: String, task_id: usize) -> Res<Task> {
-        let task = self.task_mut(task_id)
-            .ok_or(ResErr::from("Could not find task"))?;
+    pub fn remove_task(&mut self, task_id: usize) -> Res<Task> {
+        let group = self.resolve_group()?;
+        let task = group.task_mut(task_id)
+            .ok_or(ResErr::from("Could not find task in group"))?;
+
         let clone = task.clone();
-
-        let group = self.group_mut(&group_name)
-            .ok_or(ResErr::from("Could not find group"))?;
-
         group.tasks.retain(|t| *t != clone);
 
         if self.current_task.filter(|curr| *curr == clone.id).is_some() {
@@ -123,13 +145,28 @@ impl Manager {
         Ok(clone)
     }
 
+    pub fn use_group(&mut self, group_id: usize) -> Res<Group> {
+        let group = self.group_by_id(group_id)
+            .ok_or(ResErr::from("Could not find group!"))?;
+        let clone = group.clone();
+
+        self.current_group = Some(group.id);
+
+        Ok(clone)
+    }
+
+    pub fn reset_group(&mut self) {
+        // Just reset the group (none)
+        self.current_group = None;
+    }
+
     /// Start the task with the task_id
     /// Return a Res<Task>. The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
     pub fn start_task(&mut self, task_id: usize) -> Res<Task> {
-        // Get the task from the task_id
-        let task = self.task_mut(task_id)
-            .ok_or(ResErr::from("Could not find task"))?;
+        let group = self.resolve_group()?;
+        let task = group.task_mut(task_id)
+            .ok_or(ResErr::from("Could not find task in group!"))?;
 
         // Begin the current task
         task.start();
@@ -152,10 +189,12 @@ impl Manager {
     /// Return a Res<Task>. The returned Task is a clone, implying that it
     /// cannot be used to modify the existing data structure.
     pub fn stop_current(&mut self) -> Res<Task> {
-        // Get the task based on the current running task
-        let task = self.current_task
-            .and_then(|curr| self.task_mut(curr))
-            .ok_or(ResErr::from("Could not find current task"))?;
+        let current = self.current_task;
+
+        let group = self.resolve_group()?;
+        let task = current
+            .and_then(|curr| group.task_mut(curr))
+            .ok_or(ResErr::from("Could not find current task in group"))?;
 
         // Stop the task
         task.stop();
@@ -170,18 +209,35 @@ impl Manager {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Group {
+    id: usize,
     name: String,
     tasks: Vec<Task>
 }
 
 impl Group {
-    fn new(name: String, initial_task: Task) -> Self {
+    fn new(id: usize, name: String) -> Self {
         Group {
+            id: id,
             name: name,
-            tasks: vec![initial_task]
+            tasks: Vec::new()
         }
+    }
+
+    /// Get the task with id: task_id as mutable from this group
+    fn task_mut(&mut self, task_id: usize) -> Option<&mut Task> {
+        for task in &mut self.tasks {
+            if task.id == task_id {
+                return Some(task);
+            }
+        }
+
+        None
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
     }
 }
 
@@ -227,6 +283,42 @@ impl PartialEq for Task {
 
 
 // --- Table Display ---
+
+impl TableDisplay for Manager {
+
+    fn header(&self) -> Row {
+        row!["ID", "Group"]
+    }
+
+    fn rows(&self) -> Vec<Row> {
+        let mut rows: Vec<Row> = Vec::new();
+
+        let style = |cell: Cell, is_current: bool| -> Cell {
+            if is_current {
+                return cell
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::BRIGHT_RED));
+            }
+
+            cell
+        };
+
+        for g in &self.groups {  
+            let is_current = self.current_group
+                .filter(|curr| *curr == g.id)
+                .is_some();
+
+            let v = vec![
+                style(Cell::new(&g.id.to_string()), is_current),
+                style(Cell::new(&g.name), is_current)
+            ];
+
+            rows.push(Row::new(v));
+        }
+
+        rows
+    }
+}
 
 impl TableDisplay for Group {
     

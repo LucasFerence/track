@@ -6,7 +6,9 @@ pub fn app() -> App<'static, 'static> {
         .author(crate_authors!())
         .subcommand(New::create())
         .subcommand(Remove::create())
-        .subcommand(Report::create())
+        .subcommand(Tasks::create())
+        .subcommand(Groups::create())
+        .subcommand(Use::create())
         .subcommand(Start::create())
         .subcommand(Stop::create())
 }
@@ -65,16 +67,68 @@ impl RemoveValue {
     }
 }
 
-// --- REPORT SUBCOMMAND ---
+// --- TASKS SUBCOMMAND ---
 
-pub struct Report;
-impl Report {
+pub struct Tasks;
+impl Tasks {
     fn create() -> App<'static, 'static> {
         App::new(Self::name())
     }
 
     pub fn name() -> &'static str {
-        "report"
+        "tasks"
+    }
+}
+
+// --- GROUPS SUBCOMMAND ---
+
+pub struct Groups;
+impl Groups {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+    }
+
+    pub fn name() -> &'static str {
+        "groups"
+    }
+}
+
+// --- USE SUBCOMMAND ---
+
+pub struct Use;
+impl Use {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+            .arg(UseValue::create())
+            .arg(UseReset::create())
+    }
+
+    pub fn name() -> &'static str {
+        "use"
+    }
+}
+
+pub struct UseValue;
+impl UseValue {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .index(1)
+    }
+
+    pub fn name() -> &'static str {
+        "use-value"
+    }
+}
+
+pub struct UseReset;
+impl UseReset {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .short("r")
+    }
+
+    pub fn name() -> &'static str {
+        "use-reset"
     }
 }
 

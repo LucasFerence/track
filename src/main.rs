@@ -10,8 +10,6 @@ use track::Res;
 use track::app;
 use track::manager;
 use track::table;
-use track::time;
-use track::file::FileAccess;
 
 fn main() {
     if let Err(err) = try_main() {
@@ -21,18 +19,7 @@ fn main() {
 }
 
 fn try_main() -> Res<()> {
-    // Ensure the file is correct before we do anything
-    manager::ensure_file()?;
-
-    // Get the file access and manager
-    let file_access = FileAccess::new();
-    let mut manager: manager::Manager = file_access.read()?;
-
-    // Get the gorup for today.
-    // Want it to be local so it changes when expected
-    let today_group = time::today_local()
-        .format("%F")
-        .to_string();
+    let mut manager = manager::Manager::init()?;
 
     // Match the input
     let matches = app::app().get_matches();
@@ -43,7 +30,7 @@ fn try_main() -> Res<()> {
         let task_name = sub.value_of(app::NewValue::name()).unwrap();
 
         // Add the task to todays group
-        let new_task = manager.add_task(today_group, task_name.to_owned())?;
+        let new_task = manager.add_task(task_name.to_owned())?;
 
         // Display
         println!("Added:");
@@ -56,17 +43,37 @@ fn try_main() -> Res<()> {
             .unwrap()
             .parse::<usize>()?;
 
-        let removed_task = manager.remove_task(today_group, id)?;
+        let removed_task = manager.remove_task(id)?;
 
         // Display
         println!("Removed:");
         table::display(&removed_task);
     }
 
-    // REPORT
-    else if let Some(_) = matches.subcommand_matches(app::Report::name()) {
-        if let Some(today) = manager.group(&today_group) {
-            table::display(today);
+    // TASKS
+    else if let Some(_) = matches.subcommand_matches(app::Tasks::name()) {
+        let group = manager.group()?;
+        println!("{}:", group.name());
+        table::display(group);
+    }
+
+    // GROUPS
+    else if let Some(_) = matches.subcommand_matches(app::Groups::name()) {
+        table::display(&manager);
+    }
+
+    // USE
+    else if let Some(sub) = matches.subcommand_matches(app::Use::name()) {
+        
+        if sub.occurrences_of(app::UseReset::name()) > 0 {
+            // If we want to reset the used group, it will make it whatever today is
+            manager.reset_group();
+        } else {
+            let id = sub.value_of(app::UseValue::name())
+                .unwrap()
+                .parse::<usize>()?;
+
+            manager.use_group(id)?;
         }
     }
 
@@ -91,6 +98,5 @@ fn try_main() -> Res<()> {
         table::display(&stopped_task);
     }
 
-    file_access.write(&manager)?;
-    Ok(())
+    manager.commit()
 }
