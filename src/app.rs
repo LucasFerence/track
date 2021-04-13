@@ -13,6 +13,7 @@ pub fn app() -> App<'static, 'static> {
         .subcommand(Stop::create())
         .subcommand(Tomorrow::create())
         .subcommand(Complete::create())
+        .subcommand(Archive::create())
 }
 
 // --- NEW SUBCOMMAND ---
@@ -223,5 +224,45 @@ impl CompleteCurrent {
 
     pub fn name() -> &'static str {
         "complete-curr"
+    }
+}
+
+// --- ARCHIVE SUBCOMMAND ---
+
+pub struct Archive;
+impl Archive {
+    fn create() -> App<'static, 'static> {
+        App::new(Self::name())
+            .arg(ArchiveValue::create())
+            .arg(ArchiveRetain::create())
+    }
+
+    pub fn name() -> &'static str {
+        "archive"
+    }
+}
+
+pub struct ArchiveValue;
+impl ArchiveValue {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .required(true)
+            .index(1)
+    }
+
+    pub fn name() -> &'static str {
+        "archive-value"
+    }
+}
+
+pub struct ArchiveRetain;
+impl ArchiveRetain {
+    fn create() -> Arg<'static, 'static> {
+        Arg::with_name(Self::name())
+            .short("retain")
+    }
+
+    pub fn name() -> &'static str {
+        "archive-retain"
     }
 }

@@ -232,6 +232,33 @@ impl Manager {
 
         Ok(clone)
     }
+
+    pub fn extract_groups(
+        &mut self, retain: bool, group_ids: Vec<usize>
+    ) -> Res<Vec<Group>> {
+
+        let mut extracted_groups: Vec<Group> = Vec::new();
+        let mut extracted_ids: Vec<usize> = Vec::new();
+
+        for g in self.groups.iter() {
+            if (retain && !group_ids.contains(&g.id))
+                || (!retain && group_ids.contains(&g.id))  {
+
+                extracted_ids.push(g.id);
+                extracted_groups.push(g.clone());
+            }
+        }
+        
+        // Can't remove the current selected
+        if extracted_ids.contains(&self.resolve_group()?.id) {
+            return Err(ResErr::from("Cannot archive the current group"));
+        }
+
+        // Only retain the ones that weren't extracted
+        self.groups.retain(|g| !extracted_ids.contains(&g.id));
+        
+        Ok(extracted_groups)
+    }
 }
 
 /// PRIVATE

@@ -1,6 +1,7 @@
 ///
 /// TODO:
 /// 1. Allow archiving current file or opening an archive file
+/// 2. Some way of resetting the IDS (maybe do automatically on archiving)
 
 use std::process;
 
@@ -134,6 +135,26 @@ fn try_main() -> Res<()> {
             let task = manager.complete_task(Some(id))?;
             println!("Completed:");
             table::display(&task);
+        }
+    }
+
+    // ARCHIVE
+    else if let Some(sub) = matches.subcommand_matches(app::Archive::name()) {
+
+        let retain = sub.occurrences_of(app::ArchiveRetain::name()) > 0;
+        let value = sub.value_of(app::ArchiveValue::name()).unwrap();
+
+        let split: Vec<&str> = value.split(",")
+            .map(|s| s.trim())
+            .collect();
+
+        let mut parsed_ids: Vec<usize> = Vec::new();
+        for val in split { parsed_ids.push(val.parse::<usize>()?); }
+
+        let extracted = manager.extract_groups(retain, parsed_ids)?;
+        for g in extracted {
+            // TODO: Store the archived groups in a new ID
+            println!("Archving: {} : {}", g.id(), g.name())
         }
     }
 
