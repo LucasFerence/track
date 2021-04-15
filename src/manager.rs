@@ -2,6 +2,7 @@
 /// Manager should be used to interfact directly with the data file
 /// to perform all core project actions.
 /// 
+use std::cmp;
 
 use serde::{Serialize, Deserialize};
 use prettytable::{Attr, color, Cell, Row, row, cell};
@@ -27,8 +28,6 @@ fn default_group_name() -> String {
 /// Manages groups of tasks
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Manager {
-    next_task: usize,
-    current_task: Option<usize>,
     next_group: usize,
     current_group: Option<usize>,
     groups: Vec<Group>
@@ -37,10 +36,6 @@ pub struct Manager {
 /// INIT
 impl Manager {
 
-    /// Initializes the manager and its file existence.
-    /// 
-    /// This method will return OK if the file/manager is prepared
-    /// and operations can be performed safely
     pub fn init() -> Res<Manager> {
         let file_access = FileAccess::new();
 
@@ -60,7 +55,6 @@ impl Manager {
         Ok(manager)
     }
 
-    /// Commit the manager to the file
     pub fn commit(&self) -> Res<()> {
         let file_access = FileAccess::new();
         file_access.write(self)?;
@@ -69,58 +63,13 @@ impl Manager {
     }
 }
 
-/// PUBLIC API
+/// PUBLIC
 impl Manager {
 
-    /// Get current group by resolving.
-    /// Will return OK if the group resolved correctly
     pub fn group(&mut self) -> Res<&Group> {
         Ok(self.resolve_group()?)
     }
 
-    /// Add a task with name: task_name
-    /// Return OK if the task was created/added sucessfully
-    /// 
-    /// NOTE: The returned Task is a clone, implying that it
-    /// cannot be used to modify the existing data structure.
-    pub fn add_task(&mut self, task_name: String) -> Res<Task> {
-        let task = Task::new(self.next_task, task_name);
-        let clone = task.clone();
-        
-        // Ensure the next_id is ready for the next addition
-        self.next_task += 1;
-
-        let group = self.resolve_group()?;
-        group.tasks.push(task);
-
-        Ok(clone)
-    }
-
-    /// Remove a task with id: task_id
-    /// Return OK if the task was removed sucessfully
-    /// 
-    /// NOTE: The returned Task is a clone, implying that it
-    /// cannot be used to modify the existing data structure.
-    pub fn remove_task(&mut self, task_id: usize) -> Res<Task> {
-        let group = self.resolve_group()?;
-        let task = group.task_mut(task_id)
-            .ok_or(ResErr::from("Could not find task in group"))?;
-
-        let clone = task.clone();
-        group.tasks.retain(|t| *t != clone);
-
-        if self.current_task.filter(|curr| *curr == clone.id).is_some() {
-            self.current_task = None;
-        }
-
-        Ok(clone)
-    }
-
-    /// Change the current group to operate on identified by group_id
-    /// Return OK if the group was selected as current sucessfully
-    /// 
-    /// NOTE: The returned Group is a clone, implying that it
-    /// cannot be used to modify the existing data structure.
     pub fn use_group(&mut self, group_id: usize) -> Res<Group> {
         let group = self.group_by_id(group_id)
             .ok_or(ResErr::from("Could not find group!"))?;
@@ -131,90 +80,10 @@ impl Manager {
         Ok(clone)
     }
 
-    /// Reset the current group to None.
-    /// By resetting, the operating group will be whatever is
-    /// defined by default_group_name()
     pub fn reset_group(&mut self) {
         self.current_group = None;
     }
 
-    /// Start the task with the task_id
-    /// Return a Res<Task>. The returned Task is a clone, implying that it
-    /// cannot be used to modify the existing data structure.
-    pub fn start_task(&mut self, task_id: usize) -> Res<Task> {
-        let group = self.resolve_group()?;
-        let task = group.task_mut(task_id)
-            .ok_or(ResErr::from("Could not find task in group!"))?;
-
-        // Begin the current task
-        task.start();
-
-        // Clone the task so we can be done with the mut ref
-        let clone = task.clone();
-
-        // Stop current if there is a current
-        if self.current_task.is_some() {
-            self.stop_current()?;
-        }
-    
-        // Set the current task
-        self.current_task = Some(task_id);
-
-        Ok(clone)        
-    }
-
-    /// Stop the current running task in the operating group
-    /// Return OK if the current task was stopped sucessfully
-    /// 
-    /// NOTE: The returned Task is a clone, implying that it
-    /// cannot be used to modify the existing data structure.
-    pub fn stop_current(&mut self) -> Res<Task> {
-        // Copy this out to avoid duplicate muts
-        let current = self.current_task;
-
-        let group = self.resolve_group()?;
-        let task = current
-            .and_then(|curr| group.task_mut(curr))
-            .ok_or(ResErr::from("Could not find current task in group"))?;
-
-        // Stop the task
-        task.stop();
-
-        // Clone the task so we can be done with the mut ref
-        let clone = task.clone();
-
-        // Reset the current task
-        self.current_task = None;
-
-        Ok(clone)
-    }
-
-    /// Completes a task with an optional task_id.
-    /// If task_id is None, then it is assumed to be completing
-    /// the current task.
-    /// 
-    /// NOTE: The returned Task is a clone, implying that it
-    /// cannot be used to modify the existing data structure.
-    pub fn complete_task(&mut self, task_id: Option<usize>) -> Res<Task> {
-        // Get the task_id to process, or error if there isn't one
-        let id = task_id
-            .or_else(|| self.current_task)
-            .ok_or(ResErr::from("No task or current task!"))?;
-        
-        // Get the task from the resolved group
-        let group = self.resolve_group()?;
-        let task = group.task_mut(id)
-            .ok_or(ResErr::from("Could not find task in group!"))?;
-
-        task.complete();
-        // Make sure to clone afterwards so the returned value is up to date
-        let clone = task.clone();
-        
-        Ok(clone)
-    }
-
-    /// Creates/adds a group to the manager with the name: name
-    /// Will not create groups with duplicate names!
     pub fn add_group(&mut self, name: String) -> Res<Group> {
         // Avoid duplicate named groups
         // Technically they could be supported (since groups have an ID)
@@ -259,6 +128,57 @@ impl Manager {
         
         Ok(extracted_groups)
     }
+
+    pub fn minimize_ids(&mut self) {
+        // Should just be able to process in order
+        // We can assume the IDs always get larger as we go
+        // This assumes the groups/tasks are sorted by ID
+        
+        // Always start at 1 (the absolute min)
+        let mut next_min = 1;
+
+        for group in &mut self.groups {
+            // Get the ID we are processing
+            let process_id = group.id;
+
+            // Resolve the current here if necessary
+            let is_current = self.current_group
+                .map(|c| c == process_id)
+                .unwrap_or(false);
+
+            group.id = cmp::min(process_id, next_min);
+
+            if is_current {
+                self.current_group = Some(group.id);
+            }
+
+            next_min = group.id + 1;
+        }
+
+        self.next_group = next_min;
+    }
+
+    // GROUP DELEGATES
+
+    pub fn add_task(&mut self, task_name: String) -> Res<Task> {
+        self.resolve_group()?.add_task(task_name)
+    }
+
+    pub fn remove_task(&mut self, task_id: usize) -> Res<Task> {
+        self.resolve_group()?.remove_task(task_id)
+    }
+
+    pub fn start_task(&mut self, task_id: usize) -> Res<Task> {
+        self.resolve_group()?.start_task(task_id)      
+    }
+
+    pub fn stop_current(&mut self) -> Res<Task> {
+        self.resolve_group()?.stop_current()
+    }
+
+    pub fn complete_task(&mut self, task_id: Option<usize>) -> Res<Task> {
+        self.resolve_group()?.complete_task(task_id)
+    }
 }
 
 /// PRIVATE
@@ -267,9 +187,7 @@ impl Manager {
     /// This will likely only be called once, and then is on file creation
     fn new() -> Self {
         Manager {
-            next_task: 1,
             next_group: 1,
-            current_task: None,
             current_group: None,
             groups: Vec::new()
         }
@@ -317,11 +235,11 @@ impl Manager {
     }
 }
 
-/// Holds a vector of Tasks
-/// Identified by ID
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Group {
     id: usize,
+    next_task: usize,
+    current_task: Option<usize>,
     name: String,
     tasks: Vec<Task>
 }
@@ -330,9 +248,82 @@ impl Group {
     fn new(id: usize, name: String) -> Self {
         Group {
             id: id,
+            next_task: 1,
+            current_task: None,
             name: name,
             tasks: Vec::new()
         }
+    }
+
+    fn add_task(&mut self, task_name: String) -> Res<Task> {
+        let task = Task::new(self.next_task, task_name);
+        let clone = task.clone();
+        
+        self.next_task += 1;
+        self.tasks.push(task);
+
+        Ok(clone)
+    }
+
+    fn remove_task(&mut self, task_id: usize) -> Res<Task> {
+        let task = self.task_mut(task_id)
+            .ok_or(ResErr::from("Could not find task in group"))?;
+        let clone = task.clone();
+
+        self.tasks.retain(|t| *t != clone);
+
+        if self.current_task.filter(|curr| *curr == clone.id).is_some() {
+            self.current_task = None;
+        }
+
+        Ok(clone)
+    }
+
+    fn start_task(&mut self, task_id: usize) -> Res<Task> {
+        let task = self.task_mut(task_id)
+            .ok_or(ResErr::from("Could not find task in group!"))?;
+        let clone = task.clone();
+
+        task.start();
+
+        // Stop current if there is a current
+        if self.current_task.is_some() {
+            self.stop_current()?;
+        }
+    
+        // Set the current task
+        self.current_task = Some(task_id);
+
+        Ok(clone)        
+    }
+
+    fn stop_current(&mut self) -> Res<Task> {
+        let task = self.current_task
+            .and_then(|curr| self.task_mut(curr))
+            .ok_or(ResErr::from("Could not find current task in group"))?;
+        let clone = task.clone();
+
+        // Stop the task
+        task.stop();        
+
+        // Reset the current task
+        self.current_task = None;
+
+        Ok(clone)
+    }
+
+    fn complete_task(&mut self, task_id: Option<usize>) -> Res<Task> {
+        let id = task_id
+            .or_else(|| self.current_task)
+            .ok_or(ResErr::from("No task or current task!"))?;
+        
+        let task = self.task_mut(id)
+            .ok_or(ResErr::from("Could not find task in group!"))?;
+
+        task.complete();
+        let clone = task.clone();
+    
+        Ok(clone)
     }
 
     /// Get the task with id: task_id as mutable from this group
@@ -345,6 +336,8 @@ impl Group {
 
         None
     }
+
+    // GETTERS
 
     pub fn name(&self) -> &String {
         &self.name

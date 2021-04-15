@@ -1,8 +1,3 @@
-///
-/// TODO:
-/// 1. Allow archiving current file or opening an archive file
-/// 2. Some way of resetting the IDS (maybe do automatically on archiving)
-
 use std::process;
 
 use track::{Res, ResErr};
@@ -153,9 +148,10 @@ fn try_main() -> Res<()> {
 
         let extracted = manager.extract_groups(retain, parsed_ids)?;
         for g in extracted {
-            // TODO: Store the archived groups in a new ID
             println!("Archving: {} : {}", g.id(), g.name())
         }
+
+        manager.minimize_ids();
     }
 
     manager.commit()
